@@ -34,7 +34,7 @@ export async function runPipeline(userInput: string): Promise<PipelineResult> {
 	const { trace, modifiers } = adaptWeights(patterns, { total: executionReview.totalScheduled, missed: executionReview.missed.length });
 
 	// 2. Planner layer (Includes internal prompts, parsing, and strict guard validation)
-	const plannedData = planSemester(userInput, { trace, modifiers });
+	const plannedData = await planSemester(userInput, { trace, modifiers });
 
 	// 3. Compiler layer (Standard compilation)
 	const compiledPlan = runCompiler(plannedData);
