@@ -2,14 +2,14 @@ import { ParsedData } from "../compiler/parse";
 import { buildPlanPrompt } from "./plannerPrompt";
 import { validatePlannerOutput } from "./validatePlannerOutput";
 import { PlannerJSONParseError } from "./errors";
+import { PlannerContext } from "./plannerContext";
 
 export { buildPlanPrompt };
 
 
-
-export function planSemester(input: string): ParsedData {
+export function planSemester(input: string, context?: PlannerContext): ParsedData {
 	// 1. Build the prompt (mocking the LLM input construction)
-	const prompt = buildPlanPrompt(input);
+	const prompt = buildPlanPrompt(input, context);
 
 	// 2. Simulate LLM Response (Mock Logic)
 	// In a real implementation, this comes from an API call using 'prompt'.
