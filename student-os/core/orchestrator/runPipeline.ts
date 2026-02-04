@@ -8,15 +8,15 @@ export interface PipelineResult {
 	execution: ExecutorResult;
 }
 
-export function runPipeline(userInput: string): PipelineResult {
+export async function runPipeline(userInput: string): Promise<PipelineResult> {
 	// Planner layer (Includes internal prompts, parsing, and strict guard validation)
 	const plannedData = planSemester(userInput);
 
 	// Compiler layer (Standard compilation)
 	const compiledPlan = runCompiler(plannedData);
 
-	// Executor layer (Dry-run simulation)
-	const executionResult = executePlan(compiledPlan);
+	// Executor layer (Dry-run simulation + Notion probe)
+	const executionResult = await executePlan(compiledPlan);
 
 	return {
 		plan: compiledPlan,
