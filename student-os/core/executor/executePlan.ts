@@ -5,6 +5,7 @@ import { findExistingDatabases } from "../notion/findExistingDatabases";
 import { createCoursesDatabase, createTasksDatabase } from "../notion/createDatabase";
 import { createCoursePages } from "../notion/createCoursePages";
 import { createTaskPages } from "../notion/createTaskPages";
+import { getRuntimeMode } from "../runtime/mode";
 
 export async function executePlan(plan: CompiledSemesterPlan): Promise<ExecutorResult> {
 	const result: ExecutorResult = {
@@ -13,21 +14,22 @@ export async function executePlan(plan: CompiledSemesterPlan): Promise<ExecutorR
 		createdViews: []
 	};
 
+	const mode = getRuntimeMode();
+
 	// 1. Read-Only Validation Probe
-	try {
-		const workspaceInfo = await validateWorkspace();
-		result.notionWorkspace = workspaceInfo;
-	} catch (error) {
-		// If validation fails, we proceed (execution might just check mock logic if writes disabled)
-		// But if writes are enabled, downstream calls would fail anyway.
+	if (mode !== "dry-run") {
+		try {
+			const workspaceInfo = await validateWorkspace();
+			result.notionWorkspace = workspaceInfo;
+		} catch (error) {
+			// Allow soft fail in read-only?
+			// strict mode usually throws if token missing, validated in validateEnv
+		}
 	}
 
 	// 2. Database Creation (Controlled Write Mode)
-	if (process.env.ENABLE_NOTION_WRITES === "true") {
-		const parentPageId = process.env.NOTION_PARENT_PAGE_ID;
-		if (!parentPageId) {
-			throw new Error("ENABLE_NOTION_WRITES is true, but NOTION_PARENT_PAGE_ID is missing.");
-		}
+	if (mode === "write-enabled") {
+		const parentPageId = process.env.NOTION_PARENT_PAGE_ID!; // Validated by validateEnv
 
 		const existing = await findExistingDatabases();
 		let coursesId = existing.coursesDbId;
@@ -57,27 +59,21 @@ export async function executePlan(plan: CompiledSemesterPlan): Promise<ExecutorR
 				taskIds.forEach((id: string) => result.createdPages.push(`Task Page Created: ${id}`));
 			} catch (e: any) {
 				result.createdPages.push(`Creation Aborted: ${e.message}`);
-				// We do not re-throw here to allow partial result reporting, 
-				// but the prompt implies "Throw on failure".
-				// However, "Second run -> throws safely" implies handling it or letting it crash pipeline.
-				// Checklist: "Second run -> throws safely". 
-				// I'll let it bubble up if it's a critical failure, but the prompt says "ExecutorResult matches created entities".
 				throw e;
 			}
 		}
 	} else {
-		// Write Mode OFF - Simulation Only
-		result.createdDatabases.push("[Dry Run] Would create: Student OS — Courses");
-		result.createdDatabases.push("[Dry Run] Would create: Student OS — Tasks");
+		// Read-Only or Dry-Run Simulation
+		const prefix = mode === "read-only" ? "[Read-Only]" : "[Dry Run]";
+		result.createdDatabases.push(`${prefix} Would create: Student OS — Courses`);
+		result.createdDatabases.push(`${prefix} Would create: Student OS — Tasks`);
 
-		// Simulate Page Creation from Courses (Dry Run)
 		plan.courses.forEach(course => {
-			result.createdPages.push(`[Dry Run] Course Page: ${course.name}`);
+			result.createdPages.push(`${prefix} Course Page: ${course.name}`);
 		});
 
-		// Simulate Task Creation (Dry Run)
 		plan.tasks.forEach(task => {
-			result.createdPages.push(`[Dry Run] Task Page: ${task.name}`);
+			result.createdPages.push(`${prefix} Task Page: ${task.name}`);
 		});
 	}
 
