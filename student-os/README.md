@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Student OS (Notion Edition)
+
+A strictly-typed, intelligent operating system for students, backed by Notion.
+
+## Core Capabilities
+
+1.  **Compiler (v1)**: Deterministic Intermediate Representation (IR) for semester planning.
+2.  **Planner**: LLM-driven planning layer that converts natural language (e.g., "I take Physics and Math") into valid IR.
+3.  **Executor**: Safe, write-once Notion integration.
+    - Creates "Courses" and "Tasks" databases.
+    - Populates initial data.
+    - **Safety Lock**: Default is Read-Only. Writes require explicit `ENABLE_NOTION_WRITES=true` and Production environment.
+4.  **Intelligence**:
+    - Traceable decision making.
+    - Detects execution patterns (e.g., "Lagging Courses").
+    - Adapts urgency/importance weights dynamically.
+5.  **Dashboards**:
+    - "This Week"
+    - "Upcoming"
+    - "At Risk" (High priority tasks in lagging courses)
+    - All rendered in the frontend, backed by Notion.
 
 ## Getting Started
 
-First, run the development server:
-
+### 1. Setup
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.local.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Configure .env.local
+```bash
+NOTION_OAUTH_TOKEN=secret_...
+NOTION_PARENT_PAGE_ID=...
+# ENABLE_NOTION_WRITES=true # Uncomment ONLY to create databases
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Run
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Architecture
+- **core/compiler**: Schema & Logic
+- **core/planner**: LLM Prompting & Validation
+- **core/executor**: Notion API & Dry-Run Simulation
+- **core/intelligence**: Feedback & Self-Correction loops
+- **core/views**: Frontend Dashboard Logic
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment
+See [DEPLOY.md](DEPLOY.md) for production details.
