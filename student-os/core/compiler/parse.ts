@@ -1,4 +1,4 @@
-import { Course, Task } from "../../types/compiler-ir";
+import { Course, Task, CourseType, TaskStatus } from "../../types/compiler-ir";
 
 export interface ParsedData {
 	courses: Course[];
@@ -14,6 +14,7 @@ export function parseInput(): ParsedData {
 			credits: 3,
 			status: "Active",
 			totalRisk: 0,
+			type: CourseType.CORE,
 		},
 	];
 
@@ -25,8 +26,9 @@ export function parseInput(): ParsedData {
 			type: "Assignment",
 			priority: "High",
 			dueDate: "2024-12-01T23:59:00Z",
-			status: "Not Started",
+			status: TaskStatus.TODO,
 			riskScore: 0,
+			dueWeek: 1,
 		},
 	];
 
