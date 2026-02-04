@@ -1,8 +1,11 @@
 import { ParsedData } from "../compiler/parse";
 import { buildPlanPrompt } from "./plannerPrompt";
 import { validatePlannerOutput } from "./validatePlannerOutput";
+import { PlannerJSONParseError } from "./errors";
 
 export { buildPlanPrompt };
+
+
 
 export function planSemester(input: string): ParsedData {
 	// 1. Build the prompt (mocking the LLM input construction)
@@ -12,6 +15,7 @@ export function planSemester(input: string): ParsedData {
 	// In a real implementation, this comes from an API call using 'prompt'.
 	// This JSON string mimics the raw text choice from an LLM.
 	const mockLlmResponse = JSON.stringify({
+		version: "v1",
 		courses: [
 			{
 				id: "planner-course-1",
@@ -61,7 +65,7 @@ export function planSemester(input: string): ParsedData {
 	try {
 		rawData = JSON.parse(mockLlmResponse);
 	} catch (error) {
-		throw new Error("Planner Error: Failed to parse LLM JSON output.");
+		throw new PlannerJSONParseError("Planner Error: Failed to parse LLM JSON output.");
 	}
 
 	// 4. Validate strictly
