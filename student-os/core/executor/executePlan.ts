@@ -3,6 +3,8 @@ import { ExecutorResult } from "./types";
 import { validateWorkspace } from "../notion/validateWorkspace";
 import { findExistingDatabases } from "../notion/findExistingDatabases";
 import { createCoursesDatabase, createTasksDatabase } from "../notion/createDatabase";
+import { createCoursePages } from "../notion/createCoursePages";
+import { createTaskPages } from "../notion/createTaskPages";
 
 export async function executePlan(plan: CompiledSemesterPlan): Promise<ExecutorResult> {
 	const result: ExecutorResult = {
@@ -44,16 +46,40 @@ export async function executePlan(plan: CompiledSemesterPlan): Promise<ExecutorR
 		} else if (tasksId) {
 			result.createdDatabases.push(`Found Existing: Student OS — Tasks (${tasksId})`);
 		}
+
+		// 3. Page Population (Write-Once)
+		if (coursesId && tasksId) {
+			try {
+				const courseMap = await createCoursePages(coursesId, plan.courses);
+				Object.values(courseMap).forEach((id: string) => result.createdPages.push(`Course Page Created: ${id}`));
+
+				const taskIds = await createTaskPages(tasksId, plan.tasks, courseMap);
+				taskIds.forEach((id: string) => result.createdPages.push(`Task Page Created: ${id}`));
+			} catch (e: any) {
+				result.createdPages.push(`Creation Aborted: ${e.message}`);
+				// We do not re-throw here to allow partial result reporting, 
+				// but the prompt implies "Throw on failure".
+				// However, "Second run -> throws safely" implies handling it or letting it crash pipeline.
+				// Checklist: "Second run -> throws safely". 
+				// I'll let it bubble up if it's a critical failure, but the prompt says "ExecutorResult matches created entities".
+				throw e;
+			}
+		}
 	} else {
 		// Write Mode OFF - Simulation Only
 		result.createdDatabases.push("[Dry Run] Would create: Student OS — Courses");
 		result.createdDatabases.push("[Dry Run] Would create: Student OS — Tasks");
-	}
 
-	// Simulate Page Creation from Courses (Still Dry Run only for Pages)
-	plan.courses.forEach(course => {
-		result.createdPages.push(`Course Page: ${course.name}`);
-	});
+		// Simulate Page Creation from Courses (Dry Run)
+		plan.courses.forEach(course => {
+			result.createdPages.push(`[Dry Run] Course Page: ${course.name}`);
+		});
+
+		// Simulate Task Creation (Dry Run)
+		plan.tasks.forEach(task => {
+			result.createdPages.push(`[Dry Run] Task Page: ${task.name}`);
+		});
+	}
 
 	// Simulate View Creation (from dashboards and standard views)
 	plan.dashboards.forEach(dashboard => {
