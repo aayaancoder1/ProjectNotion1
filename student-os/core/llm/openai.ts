@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { LLMProvider } from "./types";
 
 export class OpenAIProvider implements LLMProvider {
+	name = "openai";
 	private client: OpenAI;
 
 	constructor(apiKey: string) {

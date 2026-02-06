@@ -12,7 +12,17 @@ export async function planSemester(input: string, context?: PlannerContext): Pro
 	// 1. Build the prompt
 	const prompt = buildPlanPrompt(input, context);
 	let rawJsonString = "";
-	const provider = getLLMProvider();
+	let provider = null;
+
+	try {
+		provider = getLLMProvider();
+	} catch (e: any) {
+		// If hard error from factory (missing keys), re-throw
+		throw e;
+	}
+
+	console.log(`[Planner] Active Provider: ${provider ? provider.name : "Mock (Default)"}`);
+
 
 	// 2. Real Intelligence (with Retry)
 	if (provider) {
@@ -35,6 +45,10 @@ export async function planSemester(input: string, context?: PlannerContext): Pro
 					// But instructions say "Default to mock planner if ... output fails validation."
 				}
 			}
+		}
+
+		if (!rawJsonString) {
+			console.error(`[Planner] Provider ${provider.name} failed all attempts. Fallback to Mock.`);
 		}
 	}
 
