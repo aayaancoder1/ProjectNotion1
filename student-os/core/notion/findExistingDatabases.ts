@@ -13,9 +13,9 @@ export async function findExistingDatabases(): Promise<ExistingDatabases> {
 	const response = await notion.search({
 		query: "Student OS —",
 		filter: {
-			value: "database",
+			value: "data_source",
 			property: "object",
-		} as any,
+		},
 	});
 
 	const result: ExistingDatabases = {};
