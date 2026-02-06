@@ -1,9 +1,22 @@
-import OpenAI from "openai";
+import { LLMProvider } from "./types";
+import { OpenAIProvider } from "./openai";
+import { GeminiProvider } from "./gemini";
 
-export function getLLMClient(): OpenAI {
-	const apiKey = process.env.OPENAI_API_KEY;
-	if (!apiKey) {
-		throw new Error("Missing OPENAI_API_KEY environment variable.");
+export function getLLMProvider(): LLMProvider | null {
+	const providerType = process.env.LLM_PROVIDER?.toLowerCase() || "openai";
+
+	if (providerType === "gemini") {
+		const key = process.env.GEMINI_API_KEY;
+		if (!key) return null;
+		return new GeminiProvider(key);
 	}
-	return new OpenAI({ apiKey });
+
+	// Default to OpenAI
+	if (providerType === "openai") {
+		const key = process.env.OPENAI_API_KEY;
+		if (!key) return null;
+		return new OpenAIProvider(key);
+	}
+
+	return null;
 }

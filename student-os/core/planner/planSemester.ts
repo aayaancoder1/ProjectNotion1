@@ -3,7 +3,7 @@ import { buildPlanPrompt } from "./plannerPrompt";
 import { validatePlannerOutput } from "./validatePlannerOutput";
 import { PlannerJSONParseError } from "./errors";
 import { PlannerContext } from "./plannerContext";
-import { getLLMClient } from "../llm/client";
+import { getLLMProvider } from "../llm/client";
 
 export { buildPlanPrompt };
 
@@ -12,27 +12,35 @@ export async function planSemester(input: string, context?: PlannerContext): Pro
 	// 1. Build the prompt
 	const prompt = buildPlanPrompt(input, context);
 	let rawJsonString = "";
+	const provider = getLLMProvider();
 
-	// 2. Determine Mode: Real Intelligence vs Mock
-	if (process.env.OPENAI_API_KEY) {
-		try {
-			const openai = getLLMClient();
-			const response = await openai.chat.completions.create({
-				model: "gpt-4o", // Strongest model for reasoning
-				messages: [{ role: "system", content: prompt }], // Prompt contains all instructions
-				response_format: { type: "json_object" }, // Enforce JSON
-				temperature: 0, // Deterministic
-			});
+	// 2. Real Intelligence (with Retry)
+	if (provider) {
+		let attempts = 0;
+		const maxAttempts = 2;
 
-			rawJsonString = response.choices[0].message.content || "{}";
-		} catch (e: any) {
-			// If LLM call fails, we throw to avoid silent fallback to mock in production
-			throw new Error(`LLM Planning Failed: ${e.message}`);
+		while (attempts < maxAttempts) {
+			try {
+				// console.log(`Attempting LLM call (Attempt ${attempts + 1})...`);
+				rawJsonString = await provider.generateJSON(prompt);
+				// Attempt parse immediately to catch bad JSON early so we can retry
+				JSON.parse(rawJsonString);
+				break; // Success
+			} catch (e: any) {
+				attempts++;
+				console.warn(`LLM Attempt ${attempts} failed: ${e.message}`);
+				if (attempts >= maxAttempts) {
+					rawJsonString = ""; // Fail
+					// If strict failure is desired, we could throw here. 
+					// But instructions say "Default to mock planner if ... output fails validation."
+				}
+			}
 		}
-	} else {
-		// FALLBACK: Mock Logic (Legacy)
-		// console.warn("⚠️  OPENAI_API_KEY missing. Using Mock Planner.");
-		// Reduced log noise for build
+	}
+
+	// 3. Fallback or Mock Logic
+	if (!rawJsonString) {
+		// console.warn("⚠️  LLM unavailable or failed. Using Mock Planner.");
 		rawJsonString = JSON.stringify({
 			version: "v1",
 			courses: [
@@ -69,14 +77,15 @@ export async function planSemester(input: string, context?: PlannerContext): Pro
 		});
 	}
 
-	// 3. Parse JSON
+	// 4. Parse JSON
 	let rawData: any;
 	try {
 		rawData = JSON.parse(rawJsonString);
 	} catch (error) {
+		// Should be caught by retry logic above if from LLM, but this catches mock json errors too
 		throw new PlannerJSONParseError("Planner Error: Failed to parse LLM JSON output.");
 	}
 
-	// 4. Validate strictly
+	// 5. Validate strictly
 	return validatePlannerOutput(rawData);
 }
