@@ -4,15 +4,18 @@
 
 @layer base {
 	:root {
-		--background: 224 71% 4%;
-		--foreground: 213 31% 91%;
+		/* Slate 950 base for true dark mode */
+		--background: 222.2 84% 4.9%;
+		--foreground: 210 40% 98%;
 
-		--card: 224 71% 4%;
-		--card-foreground: 213 31% 91%;
+		/* Slate 900/950 for cards */
+		--card: 222.2 84% 4.9%;
+		--card-foreground: 210 40% 98%;
 
-		--popover: 224 71% 4%;
-		--popover-foreground: 215 20.2% 65.1%;
+		--popover: 222.2 84% 4.9%;
+		--popover-foreground: 210 40% 98%;
 
+		/* Crisp white/blue accents */
 		--primary: 210 40% 98%;
 		--primary-foreground: 222.2 47.4% 11.2%;
 
@@ -31,29 +34,37 @@
 		--border: 217.2 32.6% 17.5%;
 		--input: 217.2 32.6% 17.5%;
 		--ring: 212.7 26.8% 83.9%;
+
+		--radius: 0.75rem;
 	}
 }
 
 @layer base {
+	* {
+		@apply border-border;
+	}
+
 	body {
-		@apply bg-background text-foreground antialiased;
+		@apply bg-background text-foreground antialiased selection:bg-primary/20;
 		font-feature-settings: "rlig" 1, "calt" 1;
 	}
 }
 
-/* Premium scrollbar */
-::-webkit-scrollbar {
-	width: 8px;
+/* Glass utilities */
+.glass {
+	@apply bg-background/60 backdrop-blur-xl border-white/5;
 }
 
-::-webkit-scrollbar-track {
-	background: transparent;
+.glass-card {
+	@apply bg-slate-900/40 backdrop-blur-md border border-white/10 shadow-xl;
 }
 
-::-webkit-scrollbar-thumb {
-	@apply bg-secondary rounded-full;
+/* Hide scrollbar but allow scroll */
+.no-scrollbar::-webkit-scrollbar {
+	display: none;
 }
 
-::-webkit-scrollbar-thumb:hover {
-	@apply bg-muted-foreground/30;
+.no-scrollbar {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
 }
