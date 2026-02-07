@@ -57,7 +57,7 @@ export async function planSemester(input: string, context?: PlannerContext): Pro
 		// Echo the user input as a simple plan
 		rawJsonString = JSON.stringify({
 			version: "v1",
-			courses: context?.courses.map((c, i) => ({
+			courses: (context as any)?.courses?.map((c: any, i: number) => ({
 				id: `course-${i + 1}`,
 				name: c.name,
 				credits: c.credits,
@@ -65,7 +65,7 @@ export async function planSemester(input: string, context?: PlannerContext): Pro
 				totalRisk: 0,
 				type: c.type || "CORE",
 			})) || [],
-			tasks: context?.courses.flatMap((c, i) => [
+			tasks: (context as any)?.courses?.flatMap((c: any, i: number) => [
 				{
 					id: `task-${i + 1}`,
 					name: `Do ${c.name} work`,
