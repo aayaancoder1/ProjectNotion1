@@ -3,28 +3,42 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TaskCard } from "@/components/dashboard/TaskCard";
-import { CompiledSemesterPlan, Course, Task } from "@/types/compiler-ir";
+import { Course, Task } from "@/types/compiler-ir";
+import { Semester, SemesterService } from "@/core/services/semester-service";
+import { TaskService } from "@/core/services/task-service";
+import { TaskForm } from "@/components/dashboard/TaskForm";
+import { AnalyticsPanel, Filter } from "@/components/dashboard/AnalyticsPanel";
 
 export default function DashboardPage() {
-	const [plan, setPlan] = useState<CompiledSemesterPlan | null>(null);
-	const [meta, setMeta] = useState<any>(null);
+	const [plan, setPlan] = useState<Semester | null>(null);
+	const [showTaskForm, setShowTaskForm] = useState(false);
+	const [editingTask, setEditingTask] = useState<Task | null>(null);
+	const [activeFilter, setActiveFilter] = useState<Filter>(null);
 	const router = useRouter();
 
 	useEffect(() => {
 		// Safe Client-Side Hydration
 		if (typeof window !== 'undefined') {
 			try {
-				const storedPlan = sessionStorage.getItem("student-os-plan");
-				const storedMeta = sessionStorage.getItem("student-os-meta");
+				const storedId = sessionStorage.getItem("student-os-current-id");
+				let semester: Semester | undefined;
 
-				if (!storedPlan) {
+				if (storedId) {
+					semester = SemesterService.getById(storedId);
+				}
+
+				if (!semester) {
+					// Fallback to most recent
+					const all = SemesterService.getAll();
+					if (all.length > 0) semester = all[all.length - 1];
+				}
+
+				if (!semester) {
 					router.replace("/");
 					return;
 				}
 
-				const parsedPlan: CompiledSemesterPlan = JSON.parse(storedPlan);
-				setPlan(parsedPlan);
-				if (storedMeta) setMeta(JSON.parse(storedMeta));
+				setPlan(semester);
 			} catch (e) {
 				console.error("Failed to load plan", e);
 				router.replace("/");
@@ -34,11 +48,72 @@ export default function DashboardPage() {
 
 	if (!plan) return null;
 
+	const refreshPlan = () => {
+		if (plan) {
+			const updated = SemesterService.getById(plan.id);
+			if (updated) setPlan(updated);
+		}
+	};
+
+	const handleSaveTask = (taskData: any) => {
+		if (!plan) return;
+
+		if (editingTask) {
+			TaskService.updateTask(plan.id, editingTask.id, taskData);
+		} else {
+			const newTask: Task = {
+				id: crypto.randomUUID(),
+				status: "TODO" as any,
+				...taskData
+			};
+			TaskService.addTask(plan.id, newTask);
+		}
+		refreshPlan();
+		setShowTaskForm(false);
+		setEditingTask(null);
+	};
+
+	const handleEditClick = (task: Task) => {
+		setEditingTask(task);
+		setShowTaskForm(true);
+	};
+
+	const handleToggleTask = (taskId: string) => {
+		if (!plan) return;
+		const task = plan.tasks.find(t => t.id === taskId);
+		if (task) {
+			const newStatus = task.status === "DONE" ? "TODO" : "DONE";
+			TaskService.updateTask(plan.id, taskId, { status: newStatus as any });
+			refreshPlan();
+		}
+	};
+
+	const handleDeleteTask = (taskId: string) => {
+		if (!plan) return;
+		TaskService.deleteTask(plan.id, taskId);
+		refreshPlan();
+	};
+
 	// Enhance Task Data with Course Names
 	const getCourseName = (id: string) => plan.courses.find(c => c.id === id)?.name || id;
 
 	// Sorting and Filtering
-	const tasks = [...plan.tasks].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+	let tasks = [...plan.tasks].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
+	// Apply Active Filter
+	if (activeFilter) {
+		if (activeFilter.type === 'week') {
+			tasks = tasks.filter(t => (t.dueWeek || 1) === activeFilter.value);
+		} else if (activeFilter.type === 'priority') {
+			if (activeFilter.value === 'Completed') {
+				tasks = tasks.filter(t => t.status === 'DONE');
+			} else {
+				tasks = tasks.filter(t => t.priority === activeFilter.value && t.status !== 'DONE');
+			}
+		} else if (activeFilter.type === 'course') {
+			tasks = tasks.filter(t => plan.courses.find(c => c.name === activeFilter.value)?.id === t.courseId);
+		}
+	}
 
 	const riskTasks = tasks.filter(t => t.priority === "High" && t.status !== "DONE");
 	const focusTasks = tasks.filter(t => t.priority !== "High" && t.status !== "DONE").slice(0, 6);
@@ -58,6 +133,13 @@ export default function DashboardPage() {
 				<div>
 					<h1 className="text-3xl font-bold tracking-tight text-white mb-1">Command Center</h1>
 					<p className="text-slate-400 text-sm">Overview of your academic quarter.</p>
+					<button
+						onClick={() => { setEditingTask(null); setShowTaskForm(true); }}
+						className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors shadow-[0_0_15px_rgba(37,99,235,0.3)]"
+					>
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+						New Task
+					</button>
 				</div>
 				<div className="flex gap-8">
 					<div className="text-right">
@@ -73,7 +155,30 @@ export default function DashboardPage() {
 						<div className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Critical Tasks</div>
 					</div>
 				</div>
-			</header>
+			</header >
+
+			{/* Filter Banner */}
+			{activeFilter && (
+				<div className="max-w-7xl mx-auto mb-8 animate-in fade-in slide-in-from-top-2">
+					<div className="bg-blue-600/10 border border-blue-500/20 text-blue-400 px-4 py-3 rounded-lg flex items-center justify-between">
+						<div className="flex items-center gap-2">
+							<span className="text-xs uppercase font-bold tracking-wider">Active Filter:</span>
+							<span className="font-mono text-sm bg-blue-500/20 px-2 py-0.5 rounded text-blue-300">
+								{activeFilter.type === 'week' && `Week ${activeFilter.value}`}
+								{activeFilter.type === 'priority' && `${activeFilter.value} Priority`}
+								{activeFilter.type === 'course' && activeFilter.value}
+							</span>
+						</div>
+						<button
+							onClick={() => setActiveFilter(null)}
+							className="text-xs hover:text-white transition-colors flex items-center gap-1"
+						>
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+							Clear
+						</button>
+					</div>
+				</div>
+			)}
 
 			<main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
 
@@ -93,7 +198,16 @@ export default function DashboardPage() {
 								</div>
 							</div>
 							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-								{riskTasks.map(t => <TaskCard key={t.id} task={t} courseName={getCourseName(t.courseId)} />)}
+								{riskTasks.map(t => (
+									<TaskCard
+										key={t.id}
+										task={t}
+										courseName={getCourseName(t.courseId)}
+										onToggle={handleToggleTask}
+										onEdit={handleEditClick}
+										onDelete={handleDeleteTask}
+									/>
+								))}
 							</div>
 						</section>
 					)}
@@ -111,7 +225,16 @@ export default function DashboardPage() {
 						</div>
 						{focusTasks.length > 0 ? (
 							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-								{focusTasks.map(t => <TaskCard key={t.id} task={t} courseName={getCourseName(t.courseId)} />)}
+								{focusTasks.map(t => (
+									<TaskCard
+										key={t.id}
+										task={t}
+										courseName={getCourseName(t.courseId)}
+										onToggle={handleToggleTask}
+										onEdit={handleEditClick}
+										onDelete={handleDeleteTask}
+									/>
+								))}
 							</div>
 						) : (
 							<div className="p-8 border border-dashed border-white/5 rounded-xl text-center text-slate-500 text-sm italic">
@@ -125,7 +248,16 @@ export default function DashboardPage() {
 						<section className="space-y-4 pt-4 border-t border-white/5">
 							<h2 className="text-sm font-semibold text-slate-400 uppercase tracking-widest pl-1">Upcoming</h2>
 							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 opacity-75 hover:opacity-100 transition-opacity duration-500">
-								{upcomingTasks.map(t => <TaskCard key={t.id} task={t} courseName={getCourseName(t.courseId)} />)}
+								{upcomingTasks.map(t => (
+									<TaskCard
+										key={t.id}
+										task={t}
+										courseName={getCourseName(t.courseId)}
+										onToggle={handleToggleTask}
+										onEdit={handleEditClick}
+										onDelete={handleDeleteTask}
+									/>
+								))}
 							</div>
 						</section>
 					)}
@@ -134,6 +266,9 @@ export default function DashboardPage() {
 				{/* Right Col: Sticky Summary (4 cols) */}
 				<div className="lg:col-span-4 space-y-6">
 					<div className="lg:sticky lg:top-8 space-y-6">
+
+						{/* Analytics Panel */}
+						<AnalyticsPanel semester={plan} onFilter={setActiveFilter} activeFilter={activeFilter} />
 
 						{/* Semester Summary Card */}
 						<div className="bg-slate-900/30 backdrop-blur-md rounded-2xl border border-white/5 p-6 space-y-6 shadow-xl relative overflow-hidden">
@@ -176,15 +311,15 @@ export default function DashboardPage() {
 						</div>
 
 						{/* Meta Info */}
-						{meta && (
+						{plan.meta && (
 							<div className="p-4 rounded-xl border border-white/5 bg-slate-900/20 text-xs text-slate-500 space-y-2">
 								<div className="flex justify-between">
 									<span>Goal:</span>
-									<span className="text-slate-300 font-medium truncate max-w-[150px]">{meta.goal}</span>
+									<span className="text-slate-300 font-medium truncate max-w-[150px]">{plan.meta.goal}</span>
 								</div>
 								<div className="flex justify-between">
 									<span>Priority:</span>
-									<span className="text-slate-300 font-medium">{meta.priority}</span>
+									<span className="text-slate-300 font-medium">{plan.meta.priority}</span>
 								</div>
 							</div>
 						)}
@@ -193,6 +328,18 @@ export default function DashboardPage() {
 				</div>
 
 			</main>
-		</div>
+
+			{/* Task Form Modal */}
+			{
+				showTaskForm && plan && (
+					<TaskForm
+						courses={plan.courses}
+						initialData={editingTask || undefined}
+						onSubmit={handleSaveTask}
+						onCancel={() => { setShowTaskForm(false); setEditingTask(null); }}
+					/>
+				)
+			}
+		</div >
 	);
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SemesterService } from "@/core/services/semester-service";
 
 interface Course {
   id: string;
@@ -39,8 +40,12 @@ export default function PlannerPage() {
       const data = await res.json();
       if (data.success) {
         if (typeof window !== 'undefined') {
-          sessionStorage.setItem("student-os-plan", JSON.stringify(data.data));
-          sessionStorage.setItem("student-os-meta", JSON.stringify({ goal, priority, hours }));
+          const semester = SemesterService.createFromData(data.data, goal || "New Semester", {
+            goal,
+            priority,
+            hours
+          });
+          sessionStorage.setItem("student-os-current-id", semester.id);
         }
         router.push("/dashboard");
       }
