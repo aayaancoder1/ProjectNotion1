@@ -54,42 +54,33 @@ export async function planSemester(input: string, context?: PlannerContext): Pro
 
 	// 3. Fallback or Mock Logic
 	if (!rawJsonString) {
-		// console.warn("⚠️  LLM unavailable or failed. Using Mock Planner.");
+		// Echo the user input as a simple plan
 		rawJsonString = JSON.stringify({
 			version: "v1",
-			courses: [
+			courses: context?.courses.map((c, i) => ({
+				id: `course-${i + 1}`,
+				name: c.name,
+				credits: c.credits,
+				status: "Active",
+				totalRisk: 0,
+				type: c.type || "CORE",
+			})) || [],
+			tasks: context?.courses.flatMap((c, i) => [
 				{
-					id: "planner-course-1",
-					name: "Artificial Intelligence (Mock)",
-					credits: 4,
-					status: "Active",
-					totalRisk: 0,
-					type: "CORE",
-				},
-				{
-					id: "planner-course-2",
-					name: "Ethics in Tech (Mock)",
-					credits: 3,
-					status: "Active",
-					totalRisk: 0,
-					type: "ELECTIVE",
-				},
-			],
-			tasks: [
-				{
-					id: "planner-task-1",
-					name: "Neural Networks Project",
-					courseId: "planner-course-1",
+					id: `task-${i + 1}`,
+					name: `Do ${c.name} work`,
+					courseId: `course-${i + 1}`,
 					type: "Assignment",
 					priority: "High",
-					dueDate: "2024-03-01T23:59:00Z",
+					dueDate: new Date().toISOString(),
 					status: "TODO",
 					riskScore: 0,
-					dueWeek: 5,
+					dueWeek: i + 1,
 				},
-			],
+			]) || [],
 		});
 	}
+
 
 	// 4. Parse JSON
 	let rawData: any;

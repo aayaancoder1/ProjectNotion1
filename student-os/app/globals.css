@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom tokens for premium dark mode */
+body {
+  @apply bg-slate-950 text-slate-200 font-sans;
+}
+
 @layer base {
 	:root {
 		/* Slate 950 base for true dark mode */
